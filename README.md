@@ -1,0 +1,2 @@
+# basilbot
+A discord bot.
