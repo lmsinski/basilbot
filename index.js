@@ -1,7 +1,14 @@
+const fs = require('fs');
 const Discord = require('discord.js');
-const moment = require('moment');
 const client = new Discord.Client();
-const { prefix, token, formatter } = require('./config.json');
+const { prefix, token } = require('./config.json');
+client.commands = new Discord.Collection();
+const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
+
+for (const file of commandFiles) {
+	const command = require(`./commands/${file}`);
+	client.commands.set(command.name, command);
+}
 
 client.once('ready', () => {
 	console.log('Ready!');
@@ -10,22 +17,27 @@ client.on('message', message => {
 	if (!message.content.startsWith(prefix) || message.author.bot) return;
 
 	const args = message.content.slice(prefix.length).trim().split(/ +/);
-	const command = args.shift().toLowerCase();
+	const commandName = args.shift().toLowerCase();
 
-	if (command === 'basil') {
-		message.channel.send('Hi!');
-	} else if (command === 'stam') {
-		const amt = parseInt(args[0]);
-		
-		if (isNaN(amt)) {
-			return message.reply('not a valid number!');
-		} else if (amt <= 1 || amt > 119) {
-			return message.reply('you must input a number between 1 and 119!');
+	if (!client.commands.has(commandName)) return;
+
+	const command = client.commands.get(commandName);
+
+	if (command.args && !args.length) {
+		let reply = `Arguments missing, ${message.author}!`;
+
+		if (command.usage) {
+			reply += `\nProper usage: \`${prefix}${command.name} ${command.usage}\``;
 		}
-		const min = (120 - amt) * 8;
-		const currentDate = message.createdAt;
-		const newDate = new Date(currentDate.getTime() + min*60000);
-		return message.reply(moment(newDate).format(formatter));
+
+		return message.channel.send(reply);
+	}
+
+	try {
+		command.execute(message, args);
+	} catch (error) {
+		console.error(error);
+		message.reply('command not found!');
 	}
 });
 
